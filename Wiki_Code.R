@@ -1,0 +1,92 @@
+library(tm)
+library(SnowballC)
+library(caTools)
+library(rpart)
+library(randomForest)
+library(rpart.plot)
+library(e1071)
+library(caret)
+library(ROCR)
+wiki<-read.csv("wiki.csv",stringsAsFactors = FALSE)
+str(wiki)
+wiki$Vandal<-as.factor(wiki$Vandal)
+table(wiki$Vandal)
+###wiki_added
+wiki_added<-Corpus(VectorSource(wiki$Added))
+wiki_added<-tm_map(wiki_added,removeWords,stopwords("english"))
+wiki_added<-tm_map(wiki_added,stemDocument)
+wiki_added<-DocumentTermMatrix(wiki_added)
+wiki_added<-removeSparseTerms(wiki_added,0.997)
+wiki_added<-as.data.frame(as.matrix(wiki_added))
+str(wiki_added)
+colnames(wiki_added)<-paste("A",colnames(wiki_added))
+##wiki_removed words
+wiki_removed<-Corpus(VectorSource(wiki$Removed))
+wiki_removed<-tm_map(wiki_removed,removeWords,stopwords("english"))
+wiki_removed<-tm_map(wiki_removed,stemDocument)
+wiki_removed<-DocumentTermMatrix(wiki_removed)
+wiki_removed<-removeSparseTerms(wiki_removed,0.997)
+wiki_removed<-as.data.frame(as.matrix(wiki_removed))
+colnames(wiki_removed)<-paste("R",colnames(wiki_removed))
+str(wiki_removed)
+##combine both
+wiki_new<-cbind(wiki_added,wiki_removed)
+wiki_new$v<-wiki$Vandal
+##training and test
+set.seed(123)
+split<-sample.split(wiki_new$v,SplitRatio = 0.7)
+wiki_train<-subset(wiki_new,split==TRUE)
+wiki_test<-subset(wiki_new,split==FALSE)
+table(wiki_test$v)
+##CART
+wiki_cart<-rpart(v~.,data=wiki_train,method="class")
+prp(wiki_cart)
+wiki_cart_pre<-predict(wiki_cart,newdata=wiki_test,type="class")
+table(wiki_test$v,wiki_cart_pre)
+(618+12)/nrow(wiki_test)
+##new df
+wiki_new1<-wiki_new
+wiki_new1$http<-as.numeric(grepl("http",wiki$Added,fixed = TRUE))
+table(wiki_new1$http)
+##train and test
+wiki_train1<-subset(wiki_new1,split==TRUE)
+wiki_test1<-subset(wiki_new1,split==FALSE)
+##CART
+wiki_cart1<-rpart(v~.,data=wiki_train1,method="class")
+prp(wiki_cart1)
+wiki_pre<-predict(wiki_cart1,newdata=wiki_test1,type="class")
+table(wiki_test1$v,wiki_pre)
+(609+57)/nrow(wiki_test1)
+##
+wiki_added1<-Corpus(VectorSource(wiki$Added))
+wiki_added1<-tm_map(wiki_added1,removeWords,stopwords("english"))
+wiki_added1<-tm_map(wiki_added1,stemDocument)
+wiki_added1<-DocumentTermMatrix(wiki_added1)
+wiki_added1$nrow
+str(wiki_new1)
+wiki_new1$add<-rowSums(as.matrix(wiki_added1))
+wiki_removed1<-Corpus(VectorSource(wiki$Removed))
+wiki_removed1<-tm_map(wiki_removed1,removeWords,stopwords("english"))
+wiki_removed1<-tm_map(wiki_removed1,stemDocument)
+wiki_removed1<-DocumentTermMatrix(wiki_removed1)
+wiki_new1$remove<-rowSums(as.matrix(wiki_removed1))
+mean(wiki_new1$add)
+##split and cart
+wiki_tr<-subset(wiki_new1,split==TRUE)
+wiki_te<-subset(wiki_new1,split==FALSE)
+#CART
+wiki_c1<-rpart(v~.,data=wiki_new1,method="class")
+prp(wiki_c1)
+pre<-predict(wiki_c1,newdata=wiki_te,type="class")
+table(wiki_te$v,pre)
+(514+248)/nrow(wiki_te)
+wiki_new1$minor<-wiki$Minor
+wiki_new1$log<-wiki$Loggedin
+wi_train<-subset(wiki_new1,split==TRUE)
+wi_test<-subset(wiki_new1,split==FALSE)
+##CART
+wi_cart<-rpart(v~.,data=wi_train,method="class")
+prp(wi_cart)
+wi_pre<-predict(wi_cart,newdata=wi_test,type="class")
+table(wi_test$v,wi_pre)
+(595+241)/nrow(wi_test)
